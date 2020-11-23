@@ -59,11 +59,12 @@ namespace dotnet_gqlgen
 
         private void AddOperationTypes(SchemaInfo schemaInfo, JToken schema)
         {
+            var tt = schema["queryType"];
             // Transform operation types to fields
             var operationTypeFields = Enum.GetNames(typeof(OperationType))
                 .Select(ot => char.ToLowerInvariant(ot[0]) + ot.Substring(1))
                 .Select(otGql => new { otGql, typeObj = schema[$"{otGql}Type"] })
-                .Where(res => res.typeObj != null)
+                .Where(res => res.typeObj != null && res.typeObj.Type != JTokenType.Null)
                 .Select(res => new Field(schemaInfo) { Name = res.otGql, TypeName = res.typeObj.ReadName() });
 
             schemaInfo.Schema.AddRange(operationTypeFields);

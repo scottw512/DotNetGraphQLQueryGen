@@ -106,28 +106,94 @@ namespace dotnet_gqlgen
 
                 var allTypes = typeInfo.Types.Concat(typeInfo.Inputs).ToDictionary(k => k.Key, v => v.Value);
 
-                string result = await engine.CompileRenderAsync("types.cshtml", new
+                var resultBuilder = new StringBuilder();
+                foreach (var typ in allTypes)
                 {
-                    Namespace = Namespace,
-                    SchemaFile = Source,
-                    Types = allTypes,
-                    Enums = typeInfo.Enums,
-                    Mutation = typeInfo.Mutation,
-                    CmdArgs = $"-n {Namespace} -c {ClientClassName} -m {ScalarMapping}"
-                });
-                Directory.CreateDirectory(OutputDir);
-                File.WriteAllText($"{OutputDir}/GeneratedTypes.cs", result);
+                    resultBuilder.Append($"public class {typ.Key}{Environment.NewLine}");
+                    resultBuilder.Append($"{{{Environment.NewLine}");
+                    foreach (var fld in typ.Value.Fields)
+                    {
+                        if (fld.Name.Contains("birth"))
+                        {
+                            var sdf = 55;
+                        }
+                        var fieldType = fld.DotNetType;
+                        if (fld.IsScalar && !fld.IsNonNullable && ! fld.IsArray && !fieldType.EndsWith("?"))
+                        {
+                            fieldType = $"{fieldType}?";
+                        }
+                        resultBuilder.Append($"\tpublic {fieldType} {fld.DotNetName} {{ get; set; }}{Environment.NewLine}");
+                    }
+                    resultBuilder.Append($"}}{Environment.NewLine}");
 
-                result = await engine.CompileRenderAsync("client.cshtml", new
-                {
-                    Namespace = Namespace,
-                    SchemaFile = Source,
-                    Query = typeInfo.Query,
-                    Mutation = typeInfo.Mutation,
-                    ClientClassName = ClientClassName,
-                    Mappings = dotnetToGqlTypeMappings
-                });
-                File.WriteAllText($"{OutputDir}/{ClientClassName}.cs", result);
+                    var graphClassName = typ.Value.IsInput ? "InputObjectGraphType" : "ObjectGraphType";
+                    resultBuilder.Append($"public class {typ.Key}Impl : {graphClassName}<{typ.Key}>{Environment.NewLine}");
+                    resultBuilder.Append($"{{{Environment.NewLine}");
+                    resultBuilder.Append($"\tpublic {typ.Key}Impl(){Environment.NewLine}");
+                    resultBuilder.Append($"\t{{{Environment.NewLine}");
+
+                    resultBuilder.Append($"\t\tName = nameof({typ.Key});{Environment.NewLine}{Environment.NewLine}");
+                    foreach (var fld in typ.Value.Fields)
+                    {
+                        var fldType = Type.GetType(fld.DotNetType);
+
+                        if (fldType != null)
+                        {
+                            var gg = 66;
+                        }
+                        var nullable = fld.IsNonNullable ? "false" : "true";
+
+                        if (typ.Value.IsInput)
+                        {
+                            //Field<IntGraphType>("id");
+                            //resultBuilder.Append($"\t\tField<{GetInputGraphType(fld.DotNetType)}GraphType>(x => x.{fld.DotNetName}).Name(\"{fld.Name}\");{Environment.NewLine}");
+                            //resultBuilder.Append($"\t\tField<{GetInputGraphType(fld.DotNetType)}GraphType>(\"{fld.Name}\");{Environment.NewLine}");
+                            //Field("MyField", x => x.Id, nullable: true, type: typeof(IntGraphType));
+                            //var nullableStr = typ.Value.
+                            resultBuilder.Append($"\t\tField(\"{fld.Name}\", x => x.{fld.DotNetName}, nullable: {nullable}, type: typeof({GetInputGraphType(fld)}GraphType));{Environment.NewLine}");
+
+                        }
+                        else
+                        {
+                            if (fld.IsScalar)
+                            {
+                                resultBuilder.Append($"\t\tField(\"{fld.Name}\", x => x.{fld.DotNetName}, nullable: {nullable});{Environment.NewLine}");
+                            }
+                            else
+                            {
+                                resultBuilder.Append($"\t\tField(\"{fld.Name}\", x => x.{fld.DotNetName}, nullable: {nullable}, type: typeof({GetInputGraphType(fld)}));{Environment.NewLine}");
+                            }
+                            //resultBuilder.Append($"\t\tField(x => x.{fld.DotNetName}).Name(\"{fld.Name}\");{Environment.NewLine}");
+
+                            //Field("date_of_birth", x => x.Date_of_birth, nullable: true);
+                        }
+                    }
+
+                    resultBuilder.Append($"\t}}{Environment.NewLine}");
+                    resultBuilder.Append($"}}{Environment.NewLine}");
+                }
+                //string result = await engine.CompileRenderAsync("schemaImport.cshtml", new
+                //{
+                //    Namespace = Namespace,
+                //    SchemaFile = Source,
+                //    Types = allTypes,
+                //    Enums = typeInfo.Enums,
+                //    Mutation = typeInfo.Mutation,
+                //    CmdArgs = $"-n {Namespace} -c {ClientClassName} -m {ScalarMapping}"
+                //});
+                Directory.CreateDirectory(OutputDir);
+                File.WriteAllText($"{OutputDir}/GeneratedTypes.cs", resultBuilder.ToString());
+
+                //result = await engine.CompileRenderAsync("client.cshtml", new
+                //{
+                //    Namespace = Namespace,
+                //    SchemaFile = Source,
+                //    Query = typeInfo.Query,
+                //    Mutation = typeInfo.Mutation,
+                //    ClientClassName = ClientClassName,
+                //    Mappings = dotnetToGqlTypeMappings
+                //});
+                //File.WriteAllText($"{OutputDir}/{ClientClassName}.cs", result);
 
                 Console.WriteLine($"Done.");
             }
@@ -153,6 +219,12 @@ namespace dotnet_gqlgen
                 .Select(h => h.Split('='))
                 .Where(hs => hs.Length >= 2)
                 .ToDictionary(key => key[0], value => value[1]);
+        }
+
+        private string GetInputGraphType(Field typ)
+        {
+            var typClean = typ.DotNetType.Replace("?", "");
+            return $"{typClean.Substring(0, 1).ToUpper()}{typClean.Substring(1)}";
         }
     }
 }
